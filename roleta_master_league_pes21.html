@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#10251d">
+<title>Roleta Master League • PES 2021</title>
+<style>
+:root{color-scheme:dark;--bg:#0c1713;--panel:#14251e;--line:#2a4538;--text:#f2f6f3;--muted:#a8b9af;--green:#18864b;--gold:#e1a83b}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#1c3c2b,#0c1713 65%);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:18px 12px 36px}
+main{max-width:720px;margin:auto}.head{text-align:center;padding:10px 0 18px}.eyebrow{font-size:12px;letter-spacing:2px;color:#9ad6ae;font-weight:800}.head h1{font-size:clamp(25px,6vw,38px);margin:8px 0}.head p{color:var(--muted);margin:0}
+.panel{background:rgba(20,37,30,.96);border:1px solid var(--line);border-radius:18px;padding:16px;margin:14px 0;box-shadow:0 12px 30px #0002}
+.wheelwrap{position:relative;width:min(100%,390px);margin:0 auto}.wheelwrap canvas{display:block;width:100%;height:auto}.pointer{position:absolute;top:-3px;left:50%;transform:translateX(-50%);z-index:2;color:#fff;font-size:35px;line-height:1;text-shadow:0 2px 5px #000}
+.center{text-align:center}.muted{color:var(--muted);font-size:14px}.result{font-size:clamp(24px,6vw,34px);font-weight:850;overflow-wrap:anywhere;margin:8px 0}.status{font-size:13px;color:#b9d5c4}
+button{font:inherit;font-weight:750;border:1px solid var(--line);border-radius:12px;padding:12px 15px;background:#20362b;color:var(--text);cursor:pointer}button:disabled{opacity:.6;cursor:wait}.primary{background:var(--green);border-color:var(--green);color:white}.wide{width:100%;margin-top:14px;padding:15px;font-size:17px}
+h2{font-size:19px;margin:0 0 7px}textarea{width:100%;min-height:235px;resize:vertical;background:#0c1713;color:var(--text);border:1px solid var(--line);border-radius:12px;padding:12px;font:15px/1.7 ui-monospace,SFMono-Regular,monospace}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.actions button{flex:1 1 135px}.message{min-height:22px;color:#f1c66b;font-size:13px;margin-top:7px}.history-row{display:flex;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}.history-row:last-child{border:0}.num{color:var(--muted);min-width:25px}
+</style>
+</head>
+<body>
+<main>
+<header class="head"><div class="eyebrow">⚽ PES 2021 • VOGOS PATCH</div><h1>Roleta da Master League</h1><p>Deixe a sorte escolher seu próximo clube carioca.</p></header>
+<section class="panel">
+<div class="center muted" id="count">20 clubes na disputa</div>
+<div class="wheelwrap"><canvas id="wheel" width="700" height="700" aria-label="Roleta de clubes"></canvas><div class="pointer" aria-hidden="true">▼</div></div>
+<div class="center"><div class="status" id="status" aria-live="polite">Todos os clubes têm a mesma chance.</div><div class="result" id="result">Quem será o escolhido?</div><div class="muted" id="subresult">Edite a lista ou gire a roleta.</div></div>
+<button class="primary wide" id="spin">🎯 GIRAR A ROLETA</button>
+</section>
+<section class="panel">
+<h2>🛠️ Personalize os clubes</h2><p class="muted">Um clube por linha. Use de 2 a 30 clubes diferentes e toque em “Atualizar roleta”.</p>
+<textarea id="clubs" spellcheck="false" aria-label="Lista editável de clubes">Volta Redonda
+América-RJ
+Boavista
+Maricá
+Bangu
+Portuguesa-RJ
+Olaria
+Resende
+Sampaio Corrêa-RJ
+Audax Rio
+Cabofriense
+Nova Iguaçu
+Madureira
+Americano
+Goytacaz
+Friburguense
+Duque de Caxias
+Serrano-RJ
+Artsul
+São Gonçalo EC</textarea>
+<div class="message" id="error" aria-live="polite"></div>
+<div class="actions"><button class="primary" id="update">Atualizar roleta</button><button id="reset">Restaurar lista inicial</button><button id="copy">Copiar clube sorteado</button></div>
+</section>
+<section class="panel"><h2>📋 Histórico de sorteios</h2><div id="history" class="muted">Seus sorteios aparecerão aqui.</div><button id="clear" style="margin-top:12px">Limpar histórico</button></section>
+<p class="muted center">Arquivo independente: funciona sem internet depois de salvo no celular.</p>
+</main>
+<script>
+(()=>{
+const $=id=>document.getElementById(id),canvas=$('wheel'),ctx=canvas.getContext('2d');
+const initial=$('clubs').value.split('\\n');let clubs=initial.slice(),rotation=0,spinning=false,lastWinner='',history=[];
+const palette=['#16784a','#d79b28','#236a9d','#b84d40','#7555a3','#188b82','#bd7535','#4f698e','#9a486b','#578c45'];
+const norm=a=>((a%(2*Math.PI))+(2*Math.PI))%(2*Math.PI);
+function draw(){
+ const w=canvas.width,c=w/2,r=w*.455,step=2*Math.PI/clubs.length;
+ ctx.clearRect(0,0,w,w);ctx.save();ctx.translate(c,c);
+ ctx.beginPath();ctx.arc(0,0,r+9,0,2*Math.PI);ctx.fillStyle='#0b1711';ctx.fill();
+ clubs.forEach((name,i)=>{
+  const a=rotation+i*step-Math.PI/2,b=a+step;
+  ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,r,a,b);ctx.closePath();ctx.fillStyle=palette[i%palette.length];ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+  ctx.save();ctx.rotate(a+step/2);ctx.textAlign='right';ctx.textBaseline='middle';ctx.font='bold '+Math.max(12,Math.min(20,240/clubs.length))+'px system-ui';ctx.fillStyle='#fff';ctx.shadowColor='#0008';ctx.shadowBlur=2;
+  let label=name;const maxChars=Math.max(9,Math.floor(30/clubs.length*2.5));if(label.length>maxChars)label=label.slice(0,maxChars-1)+'…';ctx.fillText(label,r-13,0,r*.68);ctx.restore();
+ });
+ ctx.beginPath();ctx.arc(0,0,46,0,2*Math.PI);ctx.fillStyle='#f5f4e9';ctx.fill();ctx.lineWidth=5;ctx.strokeStyle='#10251d';ctx.stroke();ctx.fillStyle='#17653d';ctx.font='bold 30px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('⚽',0,1);ctx.restore();
+}
+function validate(){
+ const parsed=$('clubs').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean),unique=parsed.filter((s,i)=>parsed.findIndex(t=>t.toLocaleLowerCase('pt-BR')===s.toLocaleLowerCase('pt-BR'))===i);
+ if(unique.length<2||unique.length>30){$('error').textContent='Informe entre 2 e 30 clubes diferentes. A roleta não foi alterada.';return null}
+ $('error').textContent=unique.length!==parsed.length?'Nomes repetidos foram removidos da lista.':'';return unique;
+}
+function update(){
+ if(spinning)return;const next=validate();if(!next)return;clubs=next;rotation=0;$('count').textContent=clubs.length+' clubes na disputa';$('status').textContent='Lista atualizada • chances iguais para todos';$('result').textContent='Quem será o escolhido?';$('subresult').textContent='Pronto para girar.';draw();
+}
+function spin(){
+ if(spinning)return;const next=validate();if(!next)return;clubs=next;$('count').textContent=clubs.length+' clubes na disputa';
+ const index=Math.floor(Math.random()*clubs.length),step=2*Math.PI/clubs.length,start=rotation;
+ // A ponta da seta está no topo (-PI/2). O centro da fatia vencedora deve ficar exatamente nesse ângulo.
+ // Como cada fatia começa em rotation + i*step - PI/2, a rotação final correta é -(index+0.5)*step.
+ const desired=norm(-(index+.5)*step),extra=(8+Math.floor(Math.random()*4))*2*Math.PI;
+ const end=start+extra+norm(desired-norm(start)),duration=4700,started=performance.now();
+ spinning=true;$('spin').disabled=true;$('update').disabled=true;$('spin').textContent='🎡 A roleta está girando...';$('status').textContent='Boa sorte!';$('result').textContent='Girando...';
+ function frame(now){
+  const t=Math.min(1,(now-started)/duration),ease=1-Math.pow(1-t,5);rotation=start+(end-start)*ease;draw();
+  if(t<1){requestAnimationFrame(frame);return}
+  rotation=norm(end);spinning=false;$('spin').disabled=false;$('update').disabled=false;$('spin').textContent='🎯 GIRAR NOVAMENTE';
+  // Derive the winner from the actual final angle under the pointer, not from a separate random value.
+  const pointerRelative=norm(-rotation),actualIndex=Math.floor(norm(pointerRelative)/step);
+  // Wedges are indexed from the top; compute directly using the final rotation.
+  const selected=Math.floor(norm(-rotation)/step)%clubs.length;
+  lastWinner=clubs[selected];
+  $('status').textContent='🏆 CLUBE SORTEADO';$('result').textContent=lastWinner;$('subresult').textContent='Confira: a seta aponta para o clube sorteado.';
+  history.unshift(lastWinner);renderHistory();
+ }
+ requestAnimationFrame(frame);
+}
+function renderHistory(){const el=$('history');el.replaceChildren();if(!history.length){el.textContent='Seus sorteios aparecerão aqui.';el.className='muted';return}el.className='';history.forEach((n,i)=>{const row=document.createElement('div');row.className='history-row';const num=document.createElement('span');num.className='num';num.textContent=String(history.length-i).padStart(2,'0');const label=document.createElement('span');label.textContent=n;row.append(num,label);el.append(row)})}
+$('spin').addEventListener('click',spin);$('update').addEventListener('click',update);$('reset').addEventListener('click',()=>{if(spinning)return;$('clubs').value=initial.join('\n');update()});
+$('copy').addEventListener('click',async()=>{if(!lastWinner){$('subresult').textContent='Gire a roleta primeiro.';return}try{await navigator.clipboard.writeText(lastWinner);$('subresult').textContent='Clube copiado: '+lastWinner}catch(e){$('subresult').textContent='Clube sorteado: '+lastWinner+' (selecione e copie o nome)'}});
+$('clear').addEventListener('click',()=>{history=[];renderHistory()});draw();
+})();
+</script>
+</body></html>
